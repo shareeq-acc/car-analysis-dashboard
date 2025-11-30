@@ -1,81 +1,13 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Car, DollarSign, TrendingUp, Users } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts"
+import { fetchStatistics, type StatisticsResponse } from "@/lib/api"
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
-
-const STATIC_STATS = {
-  total_cars: 11134,
-  price_stats: {
-    min: 150000,
-    max: 171000000,
-    average: 5221849,
-    median: 3550000,
-  },
-  year_stats: {
-    min: 1965,
-    max: 2025,
-  },
-  mileage_stats: {
-    min: 1,
-    max: 1000000,
-    average: 89252,
-  },
-  top_makes: {
-    Toyota: 3476,
-    Suzuki: 2733,
-    Honda: 2146,
-    Daihatsu: 556,
-    Nissan: 410,
-    KIA: 338,
-    Hyundai: 306,
-    Changan: 160,
-    Haval: 151,
-    Mitsubishi: 119,
-  },
-  top_models: {
-    Corolla: 1108,
-    Civic: 623,
-    Alto: 615,
-    Cultus: 532,
-    Mehran: 507,
-    City: 341,
-    Raize: 317,
-    "Wagon R": 284,
-    "City 5th (GM2) Generation": 261,
-    Swift: 255,
-  },
-  top_cities: {
-    Lahore: 2807,
-    Karachi: 2624,
-    Islamabad: 2033,
-    Rawalpindi: 700,
-    Faisalabad: 382,
-    Peshawar: 354,
-    Multan: 302,
-    Gujranwala: 249,
-    Sialkot: 155,
-    Sargodha: 98,
-  },
-  transmission_distribution: {
-    Automatic: 7604,
-    Manual: 3530,
-  },
-  fuel_type_distribution: {
-    Petrol: 9365,
-    Hybrid: 1074,
-    Diesel: 474,
-    Electric: 141,
-    CNG: 65,
-  },
-  seller_type_distribution: {
-    Individual: 6092,
-    Featured: 5042,
-  },
-}
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -87,7 +19,51 @@ function formatPrice(price: number): string {
 }
 
 export function DashboardHome() {
-  const stats = STATIC_STATS
+  const [stats, setStats] = useState<StatisticsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadStatistics() {
+      try {
+        setLoading(true)
+        const data = await fetchStatistics()
+        setStats(data)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load statistics")
+        console.error("Error fetching statistics:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadStatistics()
+  }, [])
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Card className="p-6">
+          <CardContent>
+            <p className="text-destructive">Error: {error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading || !stats) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <MetricCard key={i} title="" value="" loading={true} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   const topMakesData = Object.entries(stats.top_makes)
     .slice(0, 5)
@@ -218,7 +194,7 @@ export function DashboardHome() {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                   >
                     {transmissionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -254,7 +230,7 @@ export function DashboardHome() {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                   >
                     {fuelTypeData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

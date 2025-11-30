@@ -10,7 +10,8 @@ import { Slider } from "@/components/ui/slider"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
+import { fetchSimilarCars, type SimilarCarsResponse } from "@/lib/api"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -135,7 +136,7 @@ const STATIC_SIMILAR_CARS_RESPONSE = {
 }
 
 export function SimilarCars() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [form, setForm] = useState({
     make: "",
@@ -146,19 +147,33 @@ export function SimilarCars() {
     limit: 10,
   })
 
-  const [results, setResults] = useState<typeof STATIC_SIMILAR_CARS_RESPONSE | null>(null)
+  const [results, setResults] = useState<SimilarCarsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (form.make && form.model) {
       setIsLoading(true)
       setCurrentPage(1)
-      setTimeout(() => {
-        setResults(STATIC_SIMILAR_CARS_RESPONSE)
+      setError(null)
+      try {
+        const result = await fetchSimilarCars({
+          make: form.make,
+          model: form.model,
+          year: form.year,
+          price: form.price,
+          engine_capacity: form.engine_capacity,
+          limit: form.limit,
+        })
+        setResults(result)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch similar cars")
+        console.error("Error fetching similar cars:", err)
+      } finally {
         setIsLoading(false)
-      }, 500)
+      }
     }
   }
 
@@ -285,6 +300,8 @@ export function SimilarCars() {
           </Button>
         </CardContent>
       </Card>
+
+      {error && <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {/* Reference Card */}
       {results?.reference && (

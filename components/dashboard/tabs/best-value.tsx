@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { ExternalLink, Loader2, Target, ChevronLeft, ChevronRight } from "lucide-react"
+import { fetchBestValue, type BestValueResponse } from "@/lib/api"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -270,17 +271,29 @@ export function BestValue() {
   const [yearMin, setYearMin] = useState(2015)
   const [limit, setLimit] = useState(20)
   const [isLoading, setIsLoading] = useState(false)
-  const [results, setResults] = useState<typeof STATIC_BEST_VALUE_RESPONSE | null>(null)
+  const [results, setResults] = useState<BestValueResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setIsLoading(true)
     setCurrentPage(1)
-    setTimeout(() => {
-      setResults(STATIC_BEST_VALUE_RESPONSE)
+    setError(null)
+    try {
+      const result = await fetchBestValue({
+        budget_min: budgetMin,
+        budget_max: budgetMax,
+        year_min: yearMin,
+        limit: limit,
+      })
+      setResults(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch best value cars")
+      console.error("Error fetching best value cars:", err)
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   // Pagination
@@ -369,6 +382,8 @@ export function BestValue() {
           </Button>
         </CardContent>
       </Card>
+
+      {error && <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {/* Budget Summary */}
       {results && (

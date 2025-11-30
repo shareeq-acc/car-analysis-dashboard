@@ -21,7 +21,8 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
+import { fetchMarketTrend, type MarketTrendResponse } from "@/lib/api"
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
 
@@ -75,19 +76,30 @@ const STATIC_MARKET_TRENDS = {
 }
 
 export function MarketTrends() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [make, setMake] = useState("")
   const [model, setModel] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [trends, setTrends] = useState<typeof STATIC_MARKET_TRENDS | null>(null)
+  const [trends, setTrends] = useState<MarketTrendResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      setTrends(STATIC_MARKET_TRENDS)
+    setError(null)
+    try {
+      const params: any = {}
+      if (make && make !== "all") params.make = make
+      if (model) params.model = model
+
+      const result = await fetchMarketTrend(params)
+      setTrends(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch market trend")
+      console.error("Error fetching market trend:", err)
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   const priceData = trends?.price_trend.yearly_data || []
@@ -170,6 +182,8 @@ export function MarketTrends() {
           </div>
         </CardContent>
       </Card>
+
+      {error && <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {isLoading && (
         <div className="flex items-center justify-center h-64">

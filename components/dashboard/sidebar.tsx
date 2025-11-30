@@ -13,7 +13,6 @@ import {
   ChevronRight,
   GitCompare,
   Home,
-  PieChart,
   Search,
   Sparkles,
   Target,
@@ -28,7 +27,6 @@ const navItems = [
   { id: "best-value", label: "Best Value Deals", icon: Target },
   { id: "market-trends", label: "Market Trends", icon: TrendingUp },
   { id: "compare", label: "Compare Models", icon: GitCompare },
-  { id: "analytics", label: "Analytics Hub", icon: PieChart },
 ]
 
 interface SidebarProps {

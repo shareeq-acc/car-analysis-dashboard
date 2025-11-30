@@ -11,7 +11,7 @@ import { SimilarCars } from "@/components/dashboard/tabs/similar-cars"
 import { BestValue } from "@/components/dashboard/tabs/best-value"
 import { MarketTrends } from "@/components/dashboard/tabs/market-trends"
 import { CompareModels } from "@/components/dashboard/tabs/compare-models"
-import { AnalyticsHub } from "@/components/dashboard/tabs/analytics-hub"
+import { FiltersProvider } from "@/contexts/filters-context"
 
 const tabConfig: Record<string, { title: string; subtitle: string }> = {
   dashboard: {
@@ -41,10 +41,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   compare: {
     title: "Compare Models",
     subtitle: "Head-to-head model comparison",
-  },
-  analytics: {
-    title: "Analytics Hub",
-    subtitle: "Deep dive into market data",
   },
 }
 
@@ -84,8 +80,6 @@ function DashboardContent() {
         return <MarketTrends />
       case "compare":
         return <CompareModels />
-      case "analytics":
-        return <AnalyticsHub />
       default:
         return <DashboardHome />
     }
@@ -130,8 +124,10 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
-      <DashboardContent />
-    </Suspense>
+    <FiltersProvider>
+      <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
+        <DashboardContent />
+      </Suspense>
+    </FiltersProvider>
   )
 }

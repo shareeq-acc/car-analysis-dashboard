@@ -10,7 +10,8 @@ import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { GitCompare, Loader2, TrendingUp, Users, Percent, Settings, Lightbulb, CheckCircle } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
+import { compareModels, type CompareModelsResponse } from "@/lib/api"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -138,24 +139,40 @@ const getStaticComparison = (model1: string, model2: string, metric: string) => 
 }
 
 export function CompareModels() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [model1, setModel1] = useState("")
   const [model2, setModel2] = useState("")
   const [make1, setMake1] = useState("")
   const [make2, setMake2] = useState("")
-  const [metric, setMetric] = useState("price")
+  const [metric, setMetric] = useState<"price" | "popularity" | "depreciation" | "features">("price")
   const [yearsToUse, setYearsToUse] = useState(7)
   const [isLoading, setIsLoading] = useState(false)
-  const [comparison, setComparison] = useState<any>(null)
+  const [comparison, setComparison] = useState<CompareModelsResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleCompare = () => {
+  const handleCompare = async () => {
     if (model1 && model2) {
       setIsLoading(true)
-      setTimeout(() => {
-        setComparison(getStaticComparison(model1, model2, metric))
+      setError(null)
+      try {
+        const params: any = {
+          model1,
+          model2,
+          metric,
+          years_to_use: yearsToUse,
+        }
+        if (make1 && make1 !== "all") params.make1 = make1
+        if (make2 && make2 !== "all") params.make2 = make2
+
+        const result = await compareModels(params)
+        setComparison(result)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to compare models")
+        console.error("Error comparing models:", err)
+      } finally {
         setIsLoading(false)
-      }, 500)
+      }
     }
   }
 
@@ -336,6 +353,8 @@ export function CompareModels() {
           </Button>
         </CardContent>
       </Card>
+
+      {error && <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {/* Loading */}
       {isLoading && (

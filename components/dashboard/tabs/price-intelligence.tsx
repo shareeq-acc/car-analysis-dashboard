@@ -21,7 +21,15 @@ import {
   BarChart,
   Bar,
 } from "recharts"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
+import {
+  estimatePrice,
+  type PriceEstimateResponse,
+  fetchPricePrediction,
+  type PricePredictionResponse,
+  fetchPriceAnalysis,
+  type PriceAnalysisResponse,
+} from "@/lib/api"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -91,7 +99,7 @@ const STATIC_ANALYSIS = {
 }
 
 function PriceEstimator() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [form, setForm] = useState({
     make: "",
@@ -102,7 +110,7 @@ function PriceEstimator() {
     fuel_type: "Petrol",
   })
 
-  const [estimate, setEstimate] = useState<typeof STATIC_ESTIMATE | null>(null)
+  const [estimate, setEstimate] = useState<PriceEstimateResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -113,10 +121,15 @@ function PriceEstimator() {
     }
     setLoading(true)
     setError(null)
-    setTimeout(() => {
-      setEstimate(STATIC_ESTIMATE)
+    try {
+      const result = await estimatePrice(form)
+      setEstimate(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to estimate price")
+      console.error("Error estimating price:", err)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   return (
@@ -236,31 +249,11 @@ function PriceEstimator() {
         </CardHeader>
         <CardContent>
           {estimate ? (
-            <div className="space-y-6">
-              <div className="text-center py-6">
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">Estimated Market Value</p>
                 <p className="text-5xl font-bold text-primary">{formatPrice(estimate.estimated_price)}</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  ML Prediction: {formatPrice(estimate.ml_predicted_price)}
-                </p>
               </div>
-
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="p-4 rounded-lg bg-secondary">
-                  <p className="text-xs text-muted-foreground mb-1">Min</p>
-                  <p className="font-semibold">{formatPrice(estimate.price_range.min)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-primary/10">
-                  <p className="text-xs text-muted-foreground mb-1">Average</p>
-                  <p className="font-semibold text-primary">{formatPrice(estimate.price_range.avg)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-secondary">
-                  <p className="text-xs text-muted-foreground mb-1">Max</p>
-                  <p className="font-semibold">{formatPrice(estimate.price_range.max)}</p>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground text-center">{estimate.note}</p>
             </div>
           ) : (
             <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -274,41 +267,54 @@ function PriceEstimator() {
 }
 
 function PricePredictions() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [model, setModel] = useState("")
-  const [make, setMake] = useState("")
+  const [make, setMake] = useState("all")
   const [isLoading, setIsLoading] = useState(false)
-  const [prediction, setPrediction] = useState<typeof STATIC_PREDICTION_DATA | null>(null)
+  const [prediction, setPrediction] = useState<PricePredictionResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!model) return
     setIsLoading(true)
-    setTimeout(() => {
-      setPrediction(STATIC_PREDICTION_DATA)
+    setError(null)
+    try {
+      const result = await fetchPricePrediction({ model, make })
+      setPrediction(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch price prediction")
+      console.error("Error fetching price prediction:", err)
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   const chartData = prediction
-    ? [
-        ...prediction.historical.map((d) => ({
-          year: d.year,
-          historical: d.price,
-          predicted: null,
-        })),
-        // Add the last historical point to predicted for continuity
-        {
-          year: prediction.historical[prediction.historical.length - 1].year,
-          historical: null,
-          predicted: prediction.historical[prediction.historical.length - 1].price,
-        },
-        ...prediction.predicted.map((d) => ({
-          year: d.year,
-          historical: null,
-          predicted: d.price,
-        })),
-      ]
+    ? (() => {
+        const historicalData = prediction.data.filter((d) => d.type === "historical")
+        const predictedData = prediction.data.filter((d) => d.type === "predicted")
+        const lastHistorical = historicalData[historicalData.length - 1]
+
+        return [
+          ...historicalData.map((d) => ({
+            year: d.year,
+            historical: d.price,
+            predicted: null,
+          })),
+          // Add connecting point
+          {
+            year: lastHistorical.year,
+            historical: null,
+            predicted: lastHistorical.price,
+          },
+          ...predictedData.map((d) => ({
+            year: d.year,
+            historical: null,
+            predicted: d.price,
+          })),
+        ]
+      })()
     : []
 
   return (
@@ -356,6 +362,10 @@ function PricePredictions() {
               </Button>
             </div>
           </div>
+
+          {error && (
+            <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+          )}
 
           {isLoading && (
             <div className="h-80 flex items-center justify-center">
@@ -459,25 +469,44 @@ function PricePredictions() {
 }
 
 function PriceAnalysisTab() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
-  const [groupBy, setGroupBy] = useState("make")
-  const [make, setMake] = useState("")
+  const [groupBy, setGroupBy] = useState<"make" | "model" | "year" | "city">("make")
+  const [make, setMake] = useState("all")
   const [model, setModel] = useState("")
+  const [year, setYear] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
-  const [analysis, setAnalysis] = useState<typeof STATIC_ANALYSIS | null>(null)
+  const [analysis, setAnalysis] = useState<PriceAnalysisResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      setAnalysis(STATIC_ANALYSIS)
+    setError(null)
+    try {
+      const params: any = { group_by: groupBy }
+      if (make && make !== "all") params.make = make
+      if (model) params.model = model
+      if (year) params.year = parseInt(year)
+
+      const result = await fetchPriceAnalysis(params)
+      setAnalysis(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch price analysis")
+      console.error("Error fetching price analysis:", err)
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
+  }
+
+  const truncateName = (name: string, maxLength: number = 15) => {
+    if (!name) return "Unknown"
+    return name.length > maxLength ? name.substring(0, maxLength) + "..." : name
   }
 
   const chartData =
     analysis?.analysis.slice(0, 15).map((item: any) => ({
-      name: item[groupBy as string] || "Unknown",
+      name: truncateName(String(item[groupBy] || "Unknown")),
+      fullName: item[groupBy] || "Unknown",
       average: item.average_price,
       min: item.min_price,
       max: item.max_price,
@@ -495,10 +524,10 @@ function PriceAnalysisTab() {
           <CardDescription>Analyze prices by make, model, year, or city</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-4 mb-6">
+          <div className="grid md:grid-cols-5 gap-4 items-end">
             <div className="space-y-2">
               <Label>Group By</Label>
-              <Select value={groupBy} onValueChange={setGroupBy}>
+              <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -530,19 +559,30 @@ function PriceAnalysisTab() {
               <Label>Filter by Model</Label>
               <Input placeholder="e.g. City" value={model} onChange={(e) => setModel(e.target.value)} />
             </div>
-            <div className="flex items-end">
-              <Button onClick={handleAnalyze} disabled={isLoading} className="w-full">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  "Analyze Prices"
-                )}
-              </Button>
+            <div className="space-y-2">
+              <Label>Filter by Year</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 2020"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                min={filterOptions.year_range.min}
+                max={filterOptions.year_range.max}
+              />
             </div>
+            <Button onClick={handleAnalyze} disabled={isLoading} className="w-full">
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                "Analyze Prices"
+              )}
+            </Button>
           </div>
+
+          {error && <div className="mt-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
           {isLoading ? (
             <div className="h-80 flex items-center justify-center">
@@ -554,7 +594,7 @@ function PriceAnalysisTab() {
                 <BarChart data={chartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                   <XAxis type="number" stroke="#888" tickFormatter={(v) => formatPrice(v).replace("PKR ", "")} />
-                  <YAxis dataKey="name" type="category" width={100} stroke="#888" />
+                  <YAxis dataKey="name" type="category" width={120} stroke="#888" interval={0} tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#1e1e1e",
@@ -597,7 +637,7 @@ function PriceAnalysisTab() {
                 <tbody>
                   {analysis.analysis.slice(0, 15).map((item: any, i: number) => (
                     <tr key={i} className="border-b border-border/50 hover:bg-secondary/50">
-                      <td className="p-3 font-medium">{item[groupBy as string] || "Unknown"}</td>
+                      <td className="p-3 font-medium">{item[groupBy] || "Unknown"}</td>
                       <td className="p-3 text-right text-muted-foreground">{item.count}</td>
                       <td className="p-3 text-right">{formatPrice(item.min_price)}</td>
                       <td className="p-3 text-right text-primary font-medium">{formatPrice(item.average_price)}</td>

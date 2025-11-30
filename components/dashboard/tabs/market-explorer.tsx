@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, ExternalLink, Filter, X, Search, Loader2 } from "lucide-react"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
+import { searchCars, type SearchCarsResponse } from "@/lib/api"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -168,14 +169,15 @@ export function MarketExplorer() {
     transmission: "",
     fuel_type: "",
     city: "",
-    seller_type: "",
     page: 1,
     limit: 12,
   })
   const [isLoading, setIsLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchCarsResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }))
@@ -195,29 +197,50 @@ export function MarketExplorer() {
       transmission: "",
       fuel_type: "",
       city: "",
-      seller_type: "",
       page: 1,
       limit: 12,
     })
     setHasSearched(false)
+    setSearchResults(null)
   }
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      setIsLoading(false)
+    setError(null)
+    try {
+      const result = await searchCars(filters)
+      setSearchResults(result)
       setHasSearched(true)
-    }, 500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to search cars")
+      console.error("Error searching cars:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePageChange = async (newPage: number) => {
+    setFilters((prev) => ({ ...prev, page: newPage }))
+    setIsLoading(true)
+    setError(null)
+    try {
+      const result = await searchCars({ ...filters, page: newPage })
+      setSearchResults(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to search cars")
+      console.error("Error searching cars:", err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const activeFiltersCount = Object.entries(filters).filter(
     ([key, value]) => value && key !== "page" && key !== "limit" && value !== "",
   ).length
 
-  // Pagination
-  const itemsPerPage = 6
-  const totalPages = Math.ceil(STATIC_CAR_RESULTS.length / itemsPerPage)
-  const paginatedResults = STATIC_CAR_RESULTS.slice((filters.page - 1) * itemsPerPage, filters.page * itemsPerPage)
+  const paginatedResults = searchResults?.cars || []
+  const totalPages = searchResults?.pagination.total_pages || 0
+  const currentPage = searchResults?.pagination.page || filters.page
 
   return (
     <div className="flex gap-6">
@@ -357,24 +380,6 @@ export function MarketExplorer() {
               />
             </div>
 
-            {/* Seller Type */}
-            <div className="space-y-2">
-              <Label>Seller Type</Label>
-              <Select value={filters.seller_type} onValueChange={(v) => handleFilterChange("seller_type", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {filterOptions.seller_types.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Search Button */}
             <Button onClick={handleSearch} className="w-full" disabled={isLoading}>
               {isLoading ? (
@@ -409,15 +414,31 @@ export function MarketExplorer() {
             )}
           </Button>
           <p className="text-sm text-muted-foreground">
-            {hasSearched ? `${STATIC_CAR_RESULTS.length} cars found` : "Click Search to find cars"}
+            {hasSearched && searchResults
+              ? `${searchResults.pagination.total_count} cars found`
+              : "Click Search to find cars"}
           </p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+        )}
 
         {/* Car Grid */}
         {!hasSearched ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               Set your filters and click "Search Cars" to find vehicles
+            </CardContent>
+          </Card>
+        ) : isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : paginatedResults.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              No cars found matching your criteria. Try adjusting your filters.
             </CardContent>
           </Card>
         ) : (
@@ -466,19 +487,19 @@ export function MarketExplorer() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={filters.page === 1}
-                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={currentPage === 1 || isLoading}
+                  onClick={() => handlePageChange(currentPage - 1)}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="text-sm text-muted-foreground px-4">
-                  Page {filters.page} of {totalPages}
+                  Page {currentPage} of {totalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={filters.page === totalPages}
-                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={currentPage === totalPages || isLoading}
+                  onClick={() => handlePageChange(currentPage + 1)}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>

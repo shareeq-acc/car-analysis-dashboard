@@ -7,12 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { PieChartIcon } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { STATIC_FILTERS } from "@/lib/static-data"
+import { useFilterOptions } from "@/hooks/use-filter-options"
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"]
 
 export function AnalyticsHub() {
-  const filterOptions = STATIC_FILTERS
+  const { filterOptions } = useFilterOptions()
 
   const [selectedFilter, setSelectedFilter] = useState("makes")
 
@@ -235,22 +235,6 @@ export function AnalyticsHub() {
           </Card>
         </div>
       )}
-
-      {/* Seller Types */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Seller Types</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {filterOptions.seller_types.map((s) => (
-              <div key={s} className="flex-1 min-w-[150px] p-4 rounded-lg bg-secondary text-center">
-                <p className="font-semibold">{s}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
