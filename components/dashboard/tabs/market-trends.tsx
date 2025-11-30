@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -22,6 +21,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
 
@@ -34,19 +34,61 @@ function formatPrice(price: number): string {
   return `PKR ${price.toLocaleString()}`
 }
 
+const STATIC_MARKET_TRENDS = {
+  make: "Honda",
+  model: "Civic",
+  total_listings: 958,
+  recent_listings: 124,
+  avg_mileage: 67500,
+  price_trend: {
+    current_avg: 4180000,
+    year_over_year_growth: 9.78,
+    yearly_data: [
+      { year: 2018, avg_price: 2850000, count: 145 },
+      { year: 2019, avg_price: 3120000, count: 168 },
+      { year: 2020, avg_price: 3450000, count: 185 },
+      { year: 2021, avg_price: 3720000, count: 198 },
+      { year: 2022, avg_price: 3980000, count: 142 },
+      { year: 2023, avg_price: 4180000, count: 120 },
+    ],
+  },
+  popular_cities: {
+    Karachi: 285,
+    Lahore: 312,
+    Islamabad: 156,
+    Rawalpindi: 89,
+    Faisalabad: 52,
+    Multan: 34,
+    Peshawar: 18,
+    Quetta: 12,
+  },
+  transmission_preference: {
+    Automatic: 623,
+    Manual: 335,
+  },
+  fuel_type_preference: {
+    Petrol: 812,
+    CNG: 98,
+    Hybrid: 38,
+    Diesel: 10,
+  },
+}
+
 export function MarketTrends() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
-  const [make, setMake] = useState("All makes")
+  const [make, setMake] = useState("")
   const [model, setModel] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [trends, setTrends] = useState<typeof STATIC_MARKET_TRENDS | null>(null)
 
-  const {
-    data: trends,
-    isLoading,
-    error,
-  } = useSWR(["market-trend", make, model], () =>
-    api.getMarketTrend({ make: make === "All makes" ? undefined : make, model: model || undefined }),
-  )
+  const handleAnalyze = () => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setTrends(STATIC_MARKET_TRENDS)
+      setIsLoading(false)
+    }, 500)
+  }
 
   const priceData = trends?.price_trend.yearly_data || []
   const citiesData = trends
@@ -79,16 +121,22 @@ export function MarketTrends() {
           <CardDescription>Analyze market dynamics for specific makes and models</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Make (optional)</Label>
-              <Select value={make} onValueChange={setMake}>
+              <Select
+                value={make}
+                onValueChange={(v) => {
+                  setMake(v)
+                  setTrends(null)
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All makes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="All makes">All makes</SelectItem>
-                  {filterOptions?.makes.map((m) => (
+                  <SelectItem value="all">All makes</SelectItem>
+                  {filterOptions.makes.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
                     </SelectItem>
@@ -98,7 +146,26 @@ export function MarketTrends() {
             </div>
             <div className="space-y-2">
               <Label>Model (optional)</Label>
-              <Input placeholder="e.g. City, Corolla" value={model} onChange={(e) => setModel(e.target.value)} />
+              <Input
+                placeholder="e.g. City, Corolla"
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value)
+                  setTrends(null)
+                }}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleAnalyze} disabled={isLoading} className="w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "Analyze Trends"
+                )}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -110,10 +177,10 @@ export function MarketTrends() {
         </div>
       )}
 
-      {error && (
+      {!trends && !isLoading && (
         <Card>
-          <CardContent className="py-12 text-center text-destructive">
-            Failed to load market trends. Please try again.
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Select filters and click "Analyze Trends" to see market insights
           </CardContent>
         </Card>
       )}

@@ -1,47 +1,35 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { PieChartIcon, Loader2 } from "lucide-react"
+import { PieChartIcon } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"]
 
 export function AnalyticsHub() {
-  const { data: filterOptions, isLoading } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [selectedFilter, setSelectedFilter] = useState("makes")
 
-  const makesData =
-    filterOptions?.makes.slice(0, 15).map((make, i) => ({
-      name: make,
-      value: 100 - i * 5, // Placeholder - would need actual counts
-    })) || []
+  const makesData = filterOptions.makes.slice(0, 15).map((make, i) => ({
+    name: make,
+    value: 100 - i * 5,
+  }))
 
-  const transmissionData =
-    filterOptions?.transmissions.map((t) => ({
-      name: t,
-      value: t === "Automatic" ? 60 : 40,
-    })) || []
+  const transmissionData = filterOptions.transmissions.map((t) => ({
+    name: t,
+    value: t === "Automatic" ? 60 : 40,
+  }))
 
-  const fuelData =
-    filterOptions?.fuel_types.map((f, i) => ({
-      name: f,
-      value: [50, 25, 15, 7, 3][i] || 5,
-    })) || []
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  const fuelData = filterOptions.fuel_types.map((f, i) => ({
+    name: f,
+    value: [50, 25, 15, 7, 3][i] || 5,
+  }))
 
   return (
     <div className="space-y-6">
@@ -76,11 +64,11 @@ export function AnalyticsHub() {
       {selectedFilter === "makes" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Available Makes ({filterOptions?.makes.length})</CardTitle>
+            <CardTitle className="text-lg">Available Makes ({filterOptions.makes.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2 mb-6">
-              {filterOptions?.makes.map((make) => (
+              {filterOptions.makes.map((make) => (
                 <Badge key={make} variant="secondary">
                   {make}
                 </Badge>
@@ -115,7 +103,7 @@ export function AnalyticsHub() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2 mb-6">
-              {filterOptions?.transmissions.map((t) => (
+              {filterOptions.transmissions.map((t) => (
                 <Badge key={t} variant="secondary">
                   {t}
                 </Badge>
@@ -160,7 +148,7 @@ export function AnalyticsHub() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2 mb-6">
-              {filterOptions?.fuel_types.map((f) => (
+              {filterOptions.fuel_types.map((f) => (
                 <Badge key={f} variant="secondary">
                   {f}
                 </Badge>
@@ -198,7 +186,7 @@ export function AnalyticsHub() {
       )}
 
       {/* Data Ranges */}
-      {selectedFilter === "ranges" && filterOptions && (
+      {selectedFilter === "ranges" && (
         <div className="grid md:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
@@ -255,7 +243,7 @@ export function AnalyticsHub() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
-            {filterOptions?.seller_types.map((s) => (
+            {filterOptions.seller_types.map((s) => (
               <div key={s} className="flex-1 min-w-[150px] p-4 rounded-lg bg-secondary text-center">
                 <p className="font-semibold">{s}</p>
               </div>

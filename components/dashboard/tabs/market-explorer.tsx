@@ -1,16 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, ExternalLink, Filter, X } from "lucide-react"
-import { Skeleton } from "@/components/dashboard/loading-skeleton"
+import { ChevronLeft, ChevronRight, ExternalLink, Filter, X, Search, Loader2 } from "lucide-react"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -20,6 +18,141 @@ function formatPrice(price: number): string {
   }
   return `PKR ${price.toLocaleString()}`
 }
+
+const STATIC_CAR_RESULTS = [
+  {
+    make: "Toyota",
+    model: "Corolla",
+    year: 2022,
+    mileage: 25000,
+    price: 5200000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Lahore",
+    url: "#",
+  },
+  {
+    make: "Honda",
+    model: "City",
+    year: 2021,
+    mileage: 35000,
+    price: 4100000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Karachi",
+    url: "#",
+  },
+  {
+    make: "Toyota",
+    model: "Yaris",
+    year: 2023,
+    mileage: 15000,
+    price: 4800000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Islamabad",
+    url: "#",
+  },
+  {
+    make: "Suzuki",
+    model: "Alto",
+    year: 2022,
+    mileage: 20000,
+    price: 2200000,
+    transmission: "Manual",
+    fuel_type: "Petrol",
+    city: "Lahore",
+    url: "#",
+  },
+  {
+    make: "Honda",
+    model: "Civic",
+    year: 2020,
+    mileage: 45000,
+    price: 5500000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Karachi",
+    url: "#",
+  },
+  {
+    make: "KIA",
+    model: "Sportage",
+    year: 2022,
+    mileage: 30000,
+    price: 8500000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Lahore",
+    url: "#",
+  },
+  {
+    make: "Hyundai",
+    model: "Tucson",
+    year: 2021,
+    mileage: 40000,
+    price: 7800000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Islamabad",
+    url: "#",
+  },
+  {
+    make: "Toyota",
+    model: "Fortuner",
+    year: 2020,
+    mileage: 55000,
+    price: 12500000,
+    transmission: "Automatic",
+    fuel_type: "Diesel",
+    city: "Karachi",
+    url: "#",
+  },
+  {
+    make: "Suzuki",
+    model: "Swift",
+    year: 2023,
+    mileage: 10000,
+    price: 3500000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Lahore",
+    url: "#",
+  },
+  {
+    make: "Honda",
+    model: "BR-V",
+    year: 2022,
+    mileage: 28000,
+    price: 4900000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Karachi",
+    url: "#",
+  },
+  {
+    make: "Toyota",
+    model: "Hilux",
+    year: 2021,
+    mileage: 50000,
+    price: 9800000,
+    transmission: "Automatic",
+    fuel_type: "Diesel",
+    city: "Peshawar",
+    url: "#",
+  },
+  {
+    make: "MG",
+    model: "HS",
+    year: 2023,
+    mileage: 12000,
+    price: 7200000,
+    transmission: "Automatic",
+    fuel_type: "Petrol",
+    city: "Lahore",
+    url: "#",
+  },
+]
 
 export function MarketExplorer() {
   const [showFilters, setShowFilters] = useState(true)
@@ -39,15 +172,14 @@ export function MarketExplorer() {
     page: 1,
     limit: 12,
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
-
-  const { data: results, isLoading } = useSWR(["cars", filters], () => api.searchCars(filters), {
-    keepPreviousData: true,
-  })
+  const filterOptions = STATIC_FILTERS
 
   const handleFilterChange = (key: string, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }))
+    setHasSearched(false)
   }
 
   const clearFilters = () => {
@@ -67,11 +199,25 @@ export function MarketExplorer() {
       page: 1,
       limit: 12,
     })
+    setHasSearched(false)
+  }
+
+  const handleSearch = () => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setIsLoading(false)
+      setHasSearched(true)
+    }, 500)
   }
 
   const activeFiltersCount = Object.entries(filters).filter(
     ([key, value]) => value && key !== "page" && key !== "limit" && value !== "",
   ).length
+
+  // Pagination
+  const itemsPerPage = 6
+  const totalPages = Math.ceil(STATIC_CAR_RESULTS.length / itemsPerPage)
+  const paginatedResults = STATIC_CAR_RESULTS.slice((filters.page - 1) * itemsPerPage, filters.page * itemsPerPage)
 
   return (
     <div className="flex gap-6">
@@ -100,7 +246,7 @@ export function MarketExplorer() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Makes</SelectItem>
-                  {filterOptions?.makes.map((make) => (
+                  {filterOptions.makes.map((make) => (
                     <SelectItem key={make} value={make}>
                       {make}
                     </SelectItem>
@@ -174,7 +320,7 @@ export function MarketExplorer() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  {filterOptions?.transmissions.map((t) => (
+                  {filterOptions.transmissions.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>
@@ -192,7 +338,7 @@ export function MarketExplorer() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  {filterOptions?.fuel_types.map((f) => (
+                  {filterOptions.fuel_types.map((f) => (
                     <SelectItem key={f} value={f}>
                       {f}
                     </SelectItem>
@@ -220,7 +366,7 @@ export function MarketExplorer() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  {filterOptions?.seller_types.map((s) => (
+                  {filterOptions.seller_types.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s}
                     </SelectItem>
@@ -228,6 +374,21 @@ export function MarketExplorer() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Search Button */}
+            <Button onClick={handleSearch} className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Search Cars
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -248,24 +409,21 @@ export function MarketExplorer() {
             )}
           </Button>
           <p className="text-sm text-muted-foreground">
-            {results?.pagination.total_count.toLocaleString() || 0} cars found
+            {hasSearched ? `${STATIC_CAR_RESULTS.length} cars found` : "Click Search to find cars"}
           </p>
         </div>
 
         {/* Car Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {isLoading
-            ? Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <Skeleton className="h-40" />
-                  <CardContent className="p-4 space-y-2">
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-6 w-1/3" />
-                  </CardContent>
-                </Card>
-              ))
-            : results?.cars.map((car, i) => (
+        {!hasSearched ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              Set your filters and click "Search Cars" to find vehicles
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {paginatedResults.map((car, i) => (
                 <Card key={i} className="overflow-hidden hover:border-primary/50 transition-all hover:shadow-lg group">
                   <div className="h-40 bg-gradient-to-br from-secondary to-muted flex items-center justify-center">
                     <div className="text-4xl font-bold text-muted-foreground/30">{car.make.charAt(0)}</div>
@@ -300,31 +458,33 @@ export function MarketExplorer() {
                   </CardContent>
                 </Card>
               ))}
-        </div>
+            </div>
 
-        {/* Pagination */}
-        {results && results.pagination.total_pages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-8">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={filters.page === 1}
-              onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground px-4">
-              Page {filters.page} of {results.pagination.total_pages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={filters.page === results.pagination.total_pages}
-              onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={filters.page === 1}
+                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-4">
+                  Page {filters.page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={filters.page === totalPages}
+                  onClick={() => setFilters((prev) => ({ ...prev, page: prev.page + 1 }))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

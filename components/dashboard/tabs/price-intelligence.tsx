@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions, type PriceEstimate } from "@/lib/api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +21,7 @@ import {
   BarChart,
   Bar,
 } from "recharts"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -33,8 +32,66 @@ function formatPrice(price: number): string {
   return `PKR ${price.toLocaleString()}`
 }
 
+const STATIC_ESTIMATE = {
+  input: {
+    make: "honda",
+    model: "city",
+    year: 2018,
+    mileage: 100000,
+    transmission: "auto",
+    fuel_type: "petrol",
+  },
+  estimated_price: 3540000,
+  ml_predicted_price: 4520000,
+  price_range: {
+    min: 2750000,
+    max: 4670000,
+    avg: 3627387,
+  },
+  similar_cars_count: 217,
+  note: "Estimated price adjusted for typical listing vs actual price difference",
+}
+
+const STATIC_PREDICTION_DATA = {
+  historical: [
+    { year: 2018, price: 2800000 },
+    { year: 2019, price: 3100000 },
+    { year: 2020, price: 3400000 },
+    { year: 2021, price: 3800000 },
+    { year: 2022, price: 4100000 },
+    { year: 2023, price: 4400000 },
+    { year: 2024, price: 4700000 },
+  ],
+  predicted: [
+    { year: 2025, price: 5000000 },
+    { year: 2026, price: 5300000 },
+    { year: 2027, price: 5600000 },
+  ],
+  model_stats: {
+    training_data_points: 958,
+    total_data_points: 1245,
+    latest_year: 2024,
+    slope: 285000,
+  },
+}
+
+const STATIC_ANALYSIS = {
+  analysis: [
+    { make: "Toyota", average_price: 6200000, min_price: 2100000, max_price: 15500000, count: 3476 },
+    { make: "Honda", average_price: 4800000, min_price: 1800000, max_price: 12000000, count: 2891 },
+    { make: "Suzuki", average_price: 2900000, min_price: 850000, max_price: 6500000, count: 2145 },
+    { make: "Hyundai", average_price: 5100000, min_price: 2200000, max_price: 9800000, count: 892 },
+    { make: "KIA", average_price: 5800000, min_price: 2800000, max_price: 11500000, count: 756 },
+    { make: "Mercedes", average_price: 18500000, min_price: 8500000, max_price: 45000000, count: 234 },
+    { make: "BMW", average_price: 16200000, min_price: 7200000, max_price: 38000000, count: 198 },
+    { make: "MG", average_price: 6800000, min_price: 4500000, max_price: 9200000, count: 412 },
+    { make: "Changan", average_price: 4200000, min_price: 2800000, max_price: 6500000, count: 156 },
+    { make: "Audi", average_price: 14500000, min_price: 6800000, max_price: 32000000, count: 145 },
+  ],
+}
+
 function PriceEstimator() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [form, setForm] = useState({
     make: "",
@@ -45,7 +102,7 @@ function PriceEstimator() {
     fuel_type: "Petrol",
   })
 
-  const [estimate, setEstimate] = useState<PriceEstimate | null>(null)
+  const [estimate, setEstimate] = useState<typeof STATIC_ESTIMATE | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,13 +113,10 @@ function PriceEstimator() {
     }
     setLoading(true)
     setError(null)
-    try {
-      const result = await api.estimatePrice(form)
-      setEstimate(result)
-    } catch (err) {
-      setError("Failed to estimate price. Please try again.")
-    }
-    setLoading(false)
+    setTimeout(() => {
+      setEstimate(STATIC_ESTIMATE)
+      setLoading(false)
+    }, 500)
   }
 
   return (
@@ -85,7 +139,7 @@ function PriceEstimator() {
                   <SelectValue placeholder="Select make" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filterOptions?.makes.map((make) => (
+                  {filterOptions.makes.map((make) => (
                     <SelectItem key={make} value={make}>
                       {make}
                     </SelectItem>
@@ -134,8 +188,11 @@ function PriceEstimator() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Automatic">Automatic</SelectItem>
-                  <SelectItem value="Manual">Manual</SelectItem>
+                  {filterOptions.transmissions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -146,7 +203,7 @@ function PriceEstimator() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {filterOptions?.fuel_types.map((f) => (
+                  {filterOptions.fuel_types.map((f) => (
                     <SelectItem key={f} value={f}>
                       {f}
                     </SelectItem>
@@ -217,21 +274,42 @@ function PriceEstimator() {
 }
 
 function PricePredictions() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [model, setModel] = useState("")
   const [make, setMake] = useState("")
-  const [yearsToUse, setYearsToUse] = useState(7)
+  const [isLoading, setIsLoading] = useState(false)
+  const [prediction, setPrediction] = useState<typeof STATIC_PREDICTION_DATA | null>(null)
 
-  const {
-    data: prediction,
-    isLoading,
-    error,
-  } = useSWR(model ? ["price-prediction", model, make, yearsToUse] : null, () =>
-    api.getPricePrediction({ model, make: make || undefined, years_to_use: yearsToUse }),
-  )
+  const handleAnalyze = () => {
+    if (!model) return
+    setIsLoading(true)
+    setTimeout(() => {
+      setPrediction(STATIC_PREDICTION_DATA)
+      setIsLoading(false)
+    }, 500)
+  }
 
-  const chartData = prediction?.data || []
+  const chartData = prediction
+    ? [
+        ...prediction.historical.map((d) => ({
+          year: d.year,
+          historical: d.price,
+          predicted: null,
+        })),
+        // Add the last historical point to predicted for continuity
+        {
+          year: prediction.historical[prediction.historical.length - 1].year,
+          historical: null,
+          predicted: prediction.historical[prediction.historical.length - 1].price,
+        },
+        ...prediction.predicted.map((d) => ({
+          year: d.year,
+          historical: null,
+          predicted: d.price,
+        })),
+      ]
+    : []
 
   return (
     <div className="space-y-6">
@@ -257,7 +335,7 @@ function PricePredictions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All makes</SelectItem>
-                  {filterOptions?.makes.map((m) => (
+                  {filterOptions.makes.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
                     </SelectItem>
@@ -265,9 +343,17 @@ function PricePredictions() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Years to use: {yearsToUse}</Label>
-              <Slider value={[yearsToUse]} min={3} max={20} step={1} onValueChange={(v) => setYearsToUse(v[0])} />
+            <div className="flex items-end">
+              <Button onClick={handleAnalyze} disabled={!model || isLoading} className="w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "Analyze Predictions"
+                )}
+              </Button>
             </div>
           </div>
 
@@ -277,53 +363,62 @@ function PricePredictions() {
             </div>
           )}
 
-          {error && (
-            <div className="h-80 flex items-center justify-center text-destructive">
-              Failed to load predictions. Try a different model.
-            </div>
-          )}
-
           {prediction && !isLoading && (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsLineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="year" stroke="#888" />
-                  <YAxis stroke="#888" tickFormatter={(v) => formatPrice(v).replace("PKR ", "")} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1e1e1e",
-                      border: "1px solid #333",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [formatPrice(value), "Price"]}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={(props: any) => {
-                      const { cx, cy, payload } = props
-                      return (
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={4}
-                          fill={payload.type === "predicted" ? "#3b82f6" : "#10b981"}
-                          stroke={payload.type === "predicted" ? "#3b82f6" : "#10b981"}
-                        />
-                      )
-                    }}
-                    strokeDasharray={(d: any) => (d?.type === "predicted" ? "5 5" : "0")}
-                  />
-                </RechartsLineChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              <div className="flex items-center justify-center gap-6 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-0.5 bg-emerald-500"></div>
+                  <span className="text-sm text-muted-foreground">Historical Data</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-0.5 bg-blue-500 border-dashed border-t-2 border-blue-500"></div>
+                  <span className="text-sm text-muted-foreground">Predicted (2025+)</span>
+                </div>
+              </div>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="year" stroke="#888" />
+                    <YAxis stroke="#888" tickFormatter={(v) => formatPrice(v).replace("PKR ", "")} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1e1e1e",
+                        border: "1px solid #333",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number, name: string) => [
+                        value ? formatPrice(value) : null,
+                        name === "historical" ? "Historical" : "Predicted",
+                      ]}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="historical"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={{ fill: "#10b981" }}
+                      name="Historical"
+                      connectNulls={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="predicted"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={{ fill: "#3b82f6" }}
+                      name="Predicted"
+                      connectNulls={true}
+                    />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
           )}
 
-          {!model && !isLoading && (
+          {!model && !isLoading && !prediction && (
             <div className="h-80 flex items-center justify-center text-muted-foreground">
               Enter a model name to see price predictions
             </div>
@@ -364,22 +459,24 @@ function PricePredictions() {
 }
 
 function PriceAnalysisTab() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [groupBy, setGroupBy] = useState("make")
   const [make, setMake] = useState("")
   const [model, setModel] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [analysis, setAnalysis] = useState<typeof STATIC_ANALYSIS | null>(null)
 
-  const { data: analysis, isLoading } = useSWR(["price-analysis", groupBy, make, model], () =>
-    api.getPriceAnalysis({
-      group_by: groupBy,
-      make: make || undefined,
-      model: model || undefined,
-    }),
-  )
+  const handleAnalyze = () => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setAnalysis(STATIC_ANALYSIS)
+      setIsLoading(false)
+    }, 500)
+  }
 
   const chartData =
-    analysis?.analysis.slice(0, 15).map((item) => ({
+    analysis?.analysis.slice(0, 15).map((item: any) => ({
       name: item[groupBy as string] || "Unknown",
       average: item.average_price,
       min: item.min_price,
@@ -398,7 +495,7 @@ function PriceAnalysisTab() {
           <CardDescription>Analyze prices by make, model, year, or city</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <div className="grid md:grid-cols-4 gap-4 mb-6">
             <div className="space-y-2">
               <Label>Group By</Label>
               <Select value={groupBy} onValueChange={setGroupBy}>
@@ -421,7 +518,7 @@ function PriceAnalysisTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All makes</SelectItem>
-                  {filterOptions?.makes.map((m) => (
+                  {filterOptions.makes.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
                     </SelectItem>
@@ -433,13 +530,25 @@ function PriceAnalysisTab() {
               <Label>Filter by Model</Label>
               <Input placeholder="e.g. City" value={model} onChange={(e) => setModel(e.target.value)} />
             </div>
+            <div className="flex items-end">
+              <Button onClick={handleAnalyze} disabled={isLoading} className="w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "Analyze Prices"
+                )}
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
             <div className="h-80 flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : (
+          ) : analysis ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical">
@@ -457,6 +566,10 @@ function PriceAnalysisTab() {
                   <Bar dataKey="average" fill="#10b981" name="Average Price" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-80 flex items-center justify-center text-muted-foreground">
+              Click "Analyze Prices" to see the analysis
             </div>
           )}
         </CardContent>
@@ -482,7 +595,7 @@ function PriceAnalysisTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {analysis.analysis.slice(0, 15).map((item, i) => (
+                  {analysis.analysis.slice(0, 15).map((item: any, i: number) => (
                     <tr key={i} className="border-b border-border/50 hover:bg-secondary/50">
                       <td className="p-3 font-medium">{item[groupBy as string] || "Unknown"}</td>
                       <td className="p-3 text-right text-muted-foreground">{item.count}</td>

@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -22,8 +21,121 @@ function formatPrice(price: number): string {
   return `PKR ${price.toLocaleString()}`
 }
 
+const STATIC_SIMILAR_CARS_RESPONSE = {
+  reference: {
+    make: "Honda",
+    model: "City",
+    year: 2020,
+    price: 3500000,
+    engine_capacity: 1500,
+  },
+  similar_cars: [
+    {
+      make: "Honda",
+      model: "City",
+      year: 2019,
+      engine_capacity: 1500,
+      average_price: 3200000,
+      count: 45,
+      price_range: { min: 2800000, max: 3600000 },
+      similarity_score: 0.95,
+    },
+    {
+      make: "Honda",
+      model: "City",
+      year: 2021,
+      engine_capacity: 1500,
+      average_price: 3800000,
+      count: 52,
+      price_range: { min: 3400000, max: 4200000 },
+      similarity_score: 0.93,
+    },
+    {
+      make: "Toyota",
+      model: "Yaris",
+      year: 2020,
+      engine_capacity: 1500,
+      average_price: 3400000,
+      count: 38,
+      price_range: { min: 3000000, max: 3800000 },
+      similarity_score: 0.85,
+    },
+    {
+      make: "Toyota",
+      model: "Yaris",
+      year: 2021,
+      engine_capacity: 1500,
+      average_price: 3700000,
+      count: 41,
+      price_range: { min: 3300000, max: 4100000 },
+      similarity_score: 0.82,
+    },
+    {
+      make: "Honda",
+      model: "Civic",
+      year: 2018,
+      engine_capacity: 1800,
+      average_price: 3900000,
+      count: 28,
+      price_range: { min: 3500000, max: 4300000 },
+      similarity_score: 0.78,
+    },
+    {
+      make: "Hyundai",
+      model: "Elantra",
+      year: 2020,
+      engine_capacity: 1600,
+      average_price: 3600000,
+      count: 22,
+      price_range: { min: 3200000, max: 4000000 },
+      similarity_score: 0.75,
+    },
+    {
+      make: "KIA",
+      model: "Cerato",
+      year: 2020,
+      engine_capacity: 1600,
+      average_price: 3500000,
+      count: 18,
+      price_range: { min: 3100000, max: 3900000 },
+      similarity_score: 0.72,
+    },
+    {
+      make: "Toyota",
+      model: "Corolla",
+      year: 2019,
+      engine_capacity: 1800,
+      average_price: 3800000,
+      count: 65,
+      price_range: { min: 3400000, max: 4200000 },
+      similarity_score: 0.7,
+    },
+    {
+      make: "Suzuki",
+      model: "Ciaz",
+      year: 2020,
+      engine_capacity: 1400,
+      average_price: 2900000,
+      count: 15,
+      price_range: { min: 2500000, max: 3300000 },
+      similarity_score: 0.68,
+    },
+    {
+      make: "Honda",
+      model: "City",
+      year: 2018,
+      engine_capacity: 1300,
+      average_price: 2700000,
+      count: 32,
+      price_range: { min: 2300000, max: 3100000 },
+      similarity_score: 0.65,
+    },
+  ],
+  total_similar: 10,
+}
+
 export function SimilarCars() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [form, setForm] = useState({
     make: "",
@@ -34,21 +146,26 @@ export function SimilarCars() {
     limit: 10,
   })
 
-  const [submitted, setSubmitted] = useState(false)
-
-  const {
-    data: results,
-    isLoading,
-    error,
-  } = useSWR(submitted && form.make && form.model ? ["similar-cars", form] : null, () =>
-    api.findSimilarCars(form as any),
-  )
+  const [results, setResults] = useState<typeof STATIC_SIMILAR_CARS_RESPONSE | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 6
 
   const handleSubmit = () => {
     if (form.make && form.model) {
-      setSubmitted(true)
+      setIsLoading(true)
+      setCurrentPage(1)
+      setTimeout(() => {
+        setResults(STATIC_SIMILAR_CARS_RESPONSE)
+        setIsLoading(false)
+      }, 500)
     }
   }
+
+  // Pagination
+  const totalPages = results ? Math.ceil(results.similar_cars.length / itemsPerPage) : 0
+  const paginatedResults =
+    results?.similar_cars.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) || []
 
   return (
     <div className="space-y-6">
@@ -69,14 +186,14 @@ export function SimilarCars() {
                 value={form.make}
                 onValueChange={(v) => {
                   setForm((p) => ({ ...p, make: v }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select make" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filterOptions?.makes.map((make) => (
+                  {filterOptions.makes.map((make) => (
                     <SelectItem key={make} value={make}>
                       {make}
                     </SelectItem>
@@ -92,7 +209,7 @@ export function SimilarCars() {
                 value={form.model}
                 onChange={(e) => {
                   setForm((p) => ({ ...p, model: e.target.value }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               />
             </div>
@@ -104,7 +221,7 @@ export function SimilarCars() {
                 value={form.year}
                 onChange={(e) => {
                   setForm((p) => ({ ...p, year: Number.parseInt(e.target.value) }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               />
             </div>
@@ -120,7 +237,7 @@ export function SimilarCars() {
                     ...p,
                     price: e.target.value ? Number.parseInt(e.target.value) : undefined,
                   }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               />
             </div>
@@ -136,7 +253,7 @@ export function SimilarCars() {
                     ...p,
                     engine_capacity: e.target.value ? Number.parseInt(e.target.value) : undefined,
                   }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               />
             </div>
@@ -150,7 +267,7 @@ export function SimilarCars() {
                 step={5}
                 onValueChange={(v) => {
                   setForm((p) => ({ ...p, limit: v[0] }))
-                  setSubmitted(false)
+                  setResults(null)
                 }}
               />
             </div>
@@ -205,65 +322,85 @@ export function SimilarCars() {
         </div>
       )}
 
-      {error && (
-        <Card>
-          <CardContent className="py-12 text-center text-destructive">
-            Failed to find similar cars. Please try again.
-          </CardContent>
-        </Card>
-      )}
-
       {results && results.similar_cars.length > 0 && (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {results.similar_cars.map((car, i) => (
-            <Card key={i} className="hover:border-primary/50 transition-all hover:shadow-lg">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {car.make} {car.model}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {car.year} • {car.engine_capacity}cc
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      car.similarity_score > 0.8 ? "default" : car.similarity_score > 0.6 ? "secondary" : "outline"
-                    }
-                  >
-                    {(car.similarity_score * 100).toFixed(0)}% match
-                  </Badge>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Similarity Score</span>
-                      <span>{(car.similarity_score * 100).toFixed(0)}%</span>
+        <>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedResults.map((car, i) => (
+              <Card key={i} className="hover:border-primary/50 transition-all hover:shadow-lg">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        {car.make} {car.model}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {car.year} • {car.engine_capacity}cc
+                      </p>
                     </div>
-                    <Progress value={car.similarity_score * 100} />
+                    <Badge
+                      variant={
+                        car.similarity_score > 0.8 ? "default" : car.similarity_score > 0.6 ? "secondary" : "outline"
+                      }
+                    >
+                      {(car.similarity_score * 100).toFixed(0)}% match
+                    </Badge>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div className="text-center p-2 rounded bg-secondary">
-                      <p className="text-xs text-muted-foreground">Avg Price</p>
-                      <p className="font-semibold text-primary">{formatPrice(car.average_price)}</p>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Similarity Score</span>
+                        <span>{(car.similarity_score * 100).toFixed(0)}%</span>
+                      </div>
+                      <Progress value={car.similarity_score * 100} />
                     </div>
-                    <div className="text-center p-2 rounded bg-secondary">
-                      <p className="text-xs text-muted-foreground">Listings</p>
-                      <p className="font-semibold">{car.count}</p>
-                    </div>
-                  </div>
 
-                  <div className="text-xs text-muted-foreground text-center">
-                    Price Range: {formatPrice(car.price_range.min)} - {formatPrice(car.price_range.max)}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div className="text-center p-2 rounded bg-secondary">
+                        <p className="text-xs text-muted-foreground">Avg Price</p>
+                        <p className="font-semibold text-primary">{formatPrice(car.average_price)}</p>
+                      </div>
+                      <div className="text-center p-2 rounded bg-secondary">
+                        <p className="text-xs text-muted-foreground">Listings</p>
+                        <p className="font-semibold">{car.count}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground text-center">
+                      Price Range: {formatPrice(car.price_range.min)} - {formatPrice(car.price_range.max)}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground px-4">
+                Page {currentPage} of {totalPages} • Showing {(currentPage - 1) * itemsPerPage + 1}-
+                {Math.min(currentPage * itemsPerPage, results.similar_cars.length)} of {results.similar_cars.length}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {results && results.similar_cars.length === 0 && (
@@ -274,7 +411,7 @@ export function SimilarCars() {
         </Card>
       )}
 
-      {!submitted && !isLoading && (
+      {!results && !isLoading && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             Enter car details above and click "Find Similar Cars" to see alternatives

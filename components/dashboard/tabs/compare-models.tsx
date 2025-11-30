@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
-import { api, type FilterOptions } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +10,7 @@ import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { GitCompare, Loader2, TrendingUp, Users, Percent, Settings, Lightbulb, CheckCircle } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { STATIC_FILTERS } from "@/lib/static-data"
 
 function formatPrice(price: number): string {
   if (price >= 10000000) {
@@ -22,8 +21,124 @@ function formatPrice(price: number): string {
   return `PKR ${price.toLocaleString()}`
 }
 
+const getStaticComparison = (model1: string, model2: string, metric: string) => {
+  const baseComparison = {
+    metric,
+    model1,
+    model2,
+    insights: [
+      `${model1} shows stronger market presence with more listings`,
+      `${model2} has better value retention over time`,
+      `Both models are popular choices in the sedan segment`,
+      `${model1} tends to have lower average mileage`,
+    ],
+    recommendation: `Based on the analysis, ${model1} offers better value for money while ${model2} has superior long-term investment potential.`,
+  }
+
+  if (metric === "price") {
+    return {
+      ...baseComparison,
+      comparison: {
+        [model1.toLowerCase()]: {
+          make: "Honda",
+          current_price: 4200000,
+          predicted_price_3y: 5100000,
+          growth_rate: 7.2,
+          historical_data: [
+            { year: 2019, price: 3100000 },
+            { year: 2020, price: 3400000 },
+            { year: 2021, price: 3700000 },
+            { year: 2022, price: 3900000 },
+            { year: 2023, price: 4200000 },
+          ],
+          future_predictions: [
+            { year: 2024, price: 4500000 },
+            { year: 2025, price: 4800000 },
+            { year: 2026, price: 5100000 },
+          ],
+        },
+        [model2.toLowerCase()]: {
+          make: "Toyota",
+          current_price: 4800000,
+          predicted_price_3y: 5900000,
+          growth_rate: 8.5,
+          historical_data: [
+            { year: 2019, price: 3500000 },
+            { year: 2020, price: 3800000 },
+            { year: 2021, price: 4100000 },
+            { year: 2022, price: 4400000 },
+            { year: 2023, price: 4800000 },
+          ],
+          future_predictions: [
+            { year: 2024, price: 5200000 },
+            { year: 2025, price: 5600000 },
+            { year: 2026, price: 5900000 },
+          ],
+        },
+      },
+    }
+  }
+
+  if (metric === "popularity") {
+    return {
+      ...baseComparison,
+      comparison: {
+        [model1.toLowerCase()]: {
+          make: "Honda",
+          total_listings: 2891,
+          recent_listings: 342,
+          market_share: 12.5,
+        },
+        [model2.toLowerCase()]: {
+          make: "Toyota",
+          total_listings: 3476,
+          recent_listings: 428,
+          market_share: 15.2,
+        },
+      },
+    }
+  }
+
+  if (metric === "depreciation") {
+    return {
+      ...baseComparison,
+      comparison: {
+        [model1.toLowerCase()]: {
+          make: "Honda",
+          value_retention: 72.5,
+          annual_depreciation_rate: 8.2,
+        },
+        [model2.toLowerCase()]: {
+          make: "Toyota",
+          value_retention: 78.3,
+          annual_depreciation_rate: 6.8,
+        },
+      },
+    }
+  }
+
+  // features
+  return {
+    ...baseComparison,
+    comparison: {
+      [model1.toLowerCase()]: {
+        make: "Honda",
+        avg_engine_capacity: 1498,
+        automatic_percentage: 68.5,
+        fuel_types: { Petrol: 2450, CNG: 312, Hybrid: 129 },
+      },
+      [model2.toLowerCase()]: {
+        make: "Toyota",
+        avg_engine_capacity: 1798,
+        automatic_percentage: 72.3,
+        fuel_types: { Petrol: 2890, CNG: 398, Hybrid: 188 },
+      },
+    },
+  }
+}
+
 export function CompareModels() {
-  const { data: filterOptions } = useSWR<FilterOptions>("filters", () => api.getFilters())
+  const filterOptions = STATIC_FILTERS
 
   const [model1, setModel1] = useState("")
   const [model2, setModel2] = useState("")
@@ -31,26 +146,16 @@ export function CompareModels() {
   const [make2, setMake2] = useState("")
   const [metric, setMetric] = useState("price")
   const [yearsToUse, setYearsToUse] = useState(7)
-  const [submitted, setSubmitted] = useState(false)
-
-  const {
-    data: comparison,
-    isLoading,
-    error,
-  } = useSWR(submitted && model1 && model2 ? ["compare", model1, model2, make1, make2, metric, yearsToUse] : null, () =>
-    api.compareModels({
-      model1,
-      model2,
-      make1: make1 || undefined,
-      make2: make2 || undefined,
-      metric,
-      years_to_use: yearsToUse,
-    }),
-  )
+  const [isLoading, setIsLoading] = useState(false)
+  const [comparison, setComparison] = useState<any>(null)
 
   const handleCompare = () => {
     if (model1 && model2) {
-      setSubmitted(true)
+      setIsLoading(true)
+      setTimeout(() => {
+        setComparison(getStaticComparison(model1, model2, metric))
+        setIsLoading(false)
+      }, 500)
     }
   }
 
@@ -113,7 +218,7 @@ export function CompareModels() {
                   value={model1}
                   onChange={(e) => {
                     setModel1(e.target.value)
-                    setSubmitted(false)
+                    setComparison(null)
                   }}
                 />
               </div>
@@ -123,7 +228,7 @@ export function CompareModels() {
                   value={make1}
                   onValueChange={(v) => {
                     setMake1(v)
-                    setSubmitted(false)
+                    setComparison(null)
                   }}
                 >
                   <SelectTrigger>
@@ -131,7 +236,7 @@ export function CompareModels() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All makes</SelectItem>
-                    {filterOptions?.makes.map((m) => (
+                    {filterOptions.makes.map((m) => (
                       <SelectItem key={m} value={m}>
                         {m}
                       </SelectItem>
@@ -151,7 +256,7 @@ export function CompareModels() {
                   value={model2}
                   onChange={(e) => {
                     setModel2(e.target.value)
-                    setSubmitted(false)
+                    setComparison(null)
                   }}
                 />
               </div>
@@ -161,7 +266,7 @@ export function CompareModels() {
                   value={make2}
                   onValueChange={(v) => {
                     setMake2(v)
-                    setSubmitted(false)
+                    setComparison(null)
                   }}
                 >
                   <SelectTrigger>
@@ -169,7 +274,7 @@ export function CompareModels() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All makes</SelectItem>
-                    {filterOptions?.makes.map((m) => (
+                    {filterOptions.makes.map((m) => (
                       <SelectItem key={m} value={m}>
                         {m}
                       </SelectItem>
@@ -188,7 +293,7 @@ export function CompareModels() {
                 value={metric}
                 onValueChange={(v) => {
                   setMetric(v)
-                  setSubmitted(false)
+                  setComparison(null)
                 }}
               >
                 <SelectTrigger>
@@ -212,7 +317,7 @@ export function CompareModels() {
                   step={1}
                   onValueChange={(v) => {
                     setYearsToUse(v[0])
-                    setSubmitted(false)
+                    setComparison(null)
                   }}
                 />
               </div>
@@ -239,11 +344,11 @@ export function CompareModels() {
         </div>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Empty State */}
+      {!comparison && !isLoading && (
         <Card>
-          <CardContent className="py-12 text-center text-destructive">
-            Failed to compare models. Please try different models.
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Enter two models above and select a metric to compare them
           </CardContent>
         </Card>
       )}
@@ -443,7 +548,7 @@ export function CompareModels() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {comparison.insights.map((insight, i) => (
+                  {comparison.insights.map((insight: string, i: number) => (
                     <li key={i} className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                       <span>{insight}</span>
@@ -471,14 +576,6 @@ export function CompareModels() {
             </Card>
           )}
         </>
-      )}
-
-      {!submitted && !isLoading && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Enter two models above and select a metric to compare them
-          </CardContent>
-        </Card>
       )}
     </div>
   )
