@@ -53,7 +53,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <Car className="w-6 h-6 text-primary-foreground" />
           </div>
-          {!collapsed && <span className="font-semibold text-lg text-sidebar-foreground">CarAnalytics</span>}
+          {!collapsed && <span className="font-semibold text-lg text-sidebar-foreground">SenCar</span>}
         </Link>
       </div>
 
