@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CarAnalytics - Intelligent Car Market Analysis",
+  title: "SenCar - Intelligent Car Market Analysis",
   description:
     "AI-powered car market insights for smart buying decisions. Analyze prices, compare models, and find the best deals.",
   generator: "v0.app",

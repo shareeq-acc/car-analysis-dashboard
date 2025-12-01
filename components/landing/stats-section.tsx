@@ -72,7 +72,7 @@ export function StatsSection() {
     <section className="py-20 bg-background">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-          <AnimatedStat value={11134} suffix="+" label="Cars Analyzed" delay={0} />
+          <AnimatedStat value={20000} suffix="+" label="Cars Analyzed" delay={0} />
           <AnimatedStat value={54} suffix="+" label="Brands Covered" delay={200} />
           <AnimatedStat value={15} suffix="+" label="Cities Tracked" delay={400} />
           <AnimatedStat value={99} suffix="%" label="Accuracy Rate" delay={600} />
